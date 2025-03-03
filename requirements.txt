@@ -1,3 +1,4 @@
 pandas
 numpy
-googleapiclient.discovery
+google-api-python-client
+simplejson
