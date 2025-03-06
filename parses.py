@@ -1,11 +1,6 @@
-from fileinput import lineno
-from http.client import responses
-from idlelib.replace import replace
-
 import pandas as pd
 import numpy as np
 import scipy.stats as sts
-import json
 import os
 import re
 import time
@@ -153,7 +148,7 @@ def get(video_id):
 
             # выходим из while, если комментарии закончились
             if not next_page_token: break
-            time.sleep(0.5)
+            # time.sleep(0.5)
         except googleapiclient.errors.HttpError as err:
             errors(f"Ошибка: {err}, {video_id}, {next_page_token}")
 
@@ -169,44 +164,47 @@ def second_mode(channels):
 
     for i in df['id']:
         response = videos(i)
-        videos_dict['channel'].append(response['channel'])
-        videos_dict['video'].append(response['video'])
-        videos_dict['publish_date'].append(response['publish_date'])
+        videos_dict['channel'] += response['channel']
+        videos_dict['video'] += response['video']
+        videos_dict['publish_date'] += response['publish_date']
 
     return videos_dict
 
 
-def third_mode(videos_list):
+def third_mode(tupleList):
     connection = sqlite3.connect('my_database.db')
     cursor = connection.cursor()
 
     cursor.execute('''
-    CREATE TABEL IF NOT EXIST comments(
-    channelId TEXT NOT NULL
-    videoId TEXT NOT NULL
-    userId TEXT NOT NULL
-    videoDate DATETIME 
-    commentDate DATETIME 
-    commentText TEXT NOT NULL
-    likeCount INTEGER
+    CREATE TABLE IF NOT EXISTS comments(
+    channelId TEXT NOT NULL,
+    videoId TEXT NOT NULL,
+    userId TEXT NOT NULL,
+    videoDate DATETIME,
+    commentDate DATETIME, 
+    commentText TEXT NOT NULL,
+    likeCount INTEGER,
     totalReplyCount INTEGER
     )
     ''')
-    for (channelId, videoId, videoDate) in videos_list:
+    for i, (channelId, videoId, videoDate) in enumerate(tupleList):
         comments = get(videoId)
         comments['videoDate'] = videoDate
         comments['channelId'] = channelId
-
-        comments = comments['channelId', 'videoId', 'userId', \
-            'videoDate', 'commentDate', 'commentText', 'likeCount', \
-            'totalReplyCount']
+        # print(comments.columns)
+        comments = comments[['channelId', 'videoId', 'userId',
+            'videoDate', 'commentDate', 'commentText', 'likeCount',
+            'totalReplyCount']]
 
         # добавляем данные из таблицы в базу
+        """
         for row in comments.itertuples():
+            print(row)
             cursor.execute('INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?, ?)', row)
+            connection.commit()"""
+        comments.to_sql('comments', connection, if_exists='replace', index=False)
     #закрываем базу данных
     connection.commit()
-
 
 
 
@@ -217,34 +215,40 @@ print("""
 2 -- Создание списков id видео за последний месяц для списка каналов
 3 -- создание базы данных комментариев под видео
 """)
-operating_mode = int(input('Введите номер режима работы: '))
 
-if operating_mode == 1:
-    link = input('Выбран режим обработки списков каналов. Введите ссылку на список: ')
-    tabel = channels_id(link)
-    tabel.to_json('channels_df.json')
-    print(f'Файл сохранен под именем channels_df.json в директории: {os.getcwd()}')
-elif operating_mode == 2:
-    print('Выбран режим создания списков id видео за последний месяц.')
-    link = input('Введите ссылку на список каналов (если хотите использовать\
-    из режима 1 -- введите d): ')
-    if link == 'd':
-        videos_df = pd.DataFrame(second_mode('channels_df.json'))
-        videos_df.to_json('videos.json')
-    else:
-        videos_df = pd.DataFrame(second_mode('link'))
-        videos_df.to_json('videos.json')
-elif operating_mode == 3:
-    print("""
-    Выбран режим создания базы данных. Если хотите использовать
-    файл из режима 2 -- введите d, иначе -- ссылку.
-    """)
-    link = input('Введите: ')
+while True:
+    operating_mode = int(input('Введите номер режима работы: '))
 
-    if link == 'd':
-        videos_df = pd.DataFrame(second_mode('videos.json'))
-    else:
-        videos_df = pd.DataFrame(second_mode('link'))
-    videos_list = list(zip(videos_df['channel'], videos_df['video'], videos_df['publish_date']))
+    if operating_mode == 1:
+        link = input('Выбран режим обработки списков каналов. Введите ссылку на список: ')
+        tabel = channels_id(link)
+        tabel.to_json('channels_df.json')
+        print(f'Файл сохранен под именем channels_df.json в директории: {os.getcwd()}')
+    elif operating_mode == 2:
+        print('Выбран режим создания списков id видео за последний месяц.')
+        link = input('Введите ссылку на список каналов (если хотите использовать\
+        из режима 1 -- введите d): ')
+        if link == 'd':
+            videos_df = pd.DataFrame(second_mode('channels_df.json'))
+            videos_df.to_json('videos.json')
+        else:
+            videos_df = pd.DataFrame(second_mode('link'))
+            videos_df.to_json('videos.json')
+    elif operating_mode == 3:
+        print("""
+        Выбран режим создания базы данных. Если хотите использовать
+        файл из режима 2 -- введите d, иначе -- ссылку.
+        """)
+        link = input('Введите: ')
 
-    third_mode(videos_list)
+        if link == 'd':
+            videos_df = pd.read_json('videos.json')
+        else:
+            videos_df = pd.read_json('link')
+        videos_list = list(zip(videos_df['channel'], videos_df['video'], videos_df['publish_date']))
+
+        third_mode(videos_list)
+
+    response = input('Хотите продолжить? Введите Y, если да: ')
+    if response != 'Y':
+        break
