@@ -2,3 +2,5 @@ pandas
 numpy
 google-api-python-client
 simplejson
+tqdm
+scipy
