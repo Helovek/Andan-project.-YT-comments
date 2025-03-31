@@ -12,7 +12,7 @@ from tqdm.notebook import tqdm
 from googleapiclient.discovery import build
 
 
-api_key = "AIzaSyBcH24rIhGpB1Z4zhVi2Cx-mTdK0K7WvIg"
+api_key = #...
 
 def errors(text):
     with open ('errors.txt', 'a', encoding='utf-8') as file:
